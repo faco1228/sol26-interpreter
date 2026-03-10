@@ -1,0 +1,27 @@
+{
+  "name": "sol26-interpreter",
+  "version": "1.0.0",
+  "description": "An interpreter for SOL26, a simple object language.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "npm exec -- eslint \"src/**/*.ts\"",
+    "format": "npm exec -- prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "fast-xml-parser": "~5.3.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "~9.32.0",
+    "@types/node": "~24.10.0",
+    "eslint": "~9.32.0",
+    "prettier": "~3.7.0",
+    "typescript": "~5.9.0",
+    "typescript-eslint": "~8.52.0"
+  }
+}

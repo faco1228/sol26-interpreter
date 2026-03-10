@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <!-- Simple types -->
+  <xs:simpleType name="orderType">
+    <xs:restriction base="xs:positiveInteger"/>
+  </xs:simpleType>
+
+  <xs:simpleType name="literalClassType">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="Integer"/>
+      <xs:enumeration value="String"/>
+      <xs:enumeration value="Nil"/>
+      <xs:enumeration value="True"/>
+      <xs:enumeration value="False"/>
+      <xs:enumeration value="class"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Global element types -->
+  <xs:complexType name="varType">
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="literalType">
+    <xs:attribute name="class" type="literalClassType" use="required"/>
+    <xs:attribute name="value" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="parameterType">
+    <xs:attribute name="order" type="orderType" use="required"/>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="assignType">
+    <xs:sequence>
+      <xs:element name="var" type="varType"/>
+      <xs:element name="expr" type="exprType"/>
+    </xs:sequence>
+    <xs:attribute name="order" type="orderType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="blockType">
+    <xs:sequence>
+      <xs:element name="parameter" type="parameterType" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="assign" type="assignType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="arity" type="xs:nonNegativeInteger" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="argType">
+    <xs:sequence>
+      <xs:element name="expr" type="exprType"/>
+    </xs:sequence>
+    <xs:attribute name="order" type="orderType" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="sendType">
+    <xs:sequence>
+      <xs:element name="expr" type="exprType"/>
+      <xs:element name="arg" type="argType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="selector" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="exprType">
+    <xs:choice>
+      <xs:element name="literal" type="literalType"/>
+      <xs:element name="var" type="varType"/>
+      <xs:element name="block" type="blockType"/>
+      <xs:element name="send" type="sendType"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="methodType">
+    <xs:sequence>
+      <xs:element name="block" type="blockType"/>
+    </xs:sequence>
+    <xs:attribute name="selector" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="classType">
+    <xs:sequence>
+      <xs:element name="method" type="methodType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="name" type="xs:string" use="required"/>
+    <xs:attribute name="parent" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- Root element -->
+  <xs:element name="program">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="class" type="classType" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+      <xs:attribute name="language" type="xs:string" use="required" fixed="SOL26"/>
+      <xs:attribute name="description" type="xs:string" use="optional"/>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

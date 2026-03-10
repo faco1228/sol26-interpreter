@@ -1,0 +1,2 @@
+pydantic~=2.12.5
+pydantic-xml[lxml]~=2.19.0

@@ -1,0 +1,84 @@
+[project]
+name = "sol26-tester"
+version = "1.0.0"
+description = "An integration testing script for the SOL26 interpreter."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic~=2.12.5",
+]
+
+[dependency-groups]
+dev = [
+    "mypy~=1.19.1",
+    "ruff~=0.14.4",
+]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+pretty = true
+show_error_context = true
+show_column_numbers = true
+show_error_codes = true
+explicit_package_bases = true
+mypy_path = "src"
+plugins = [
+    "pydantic.mypy"
+]
+
+[tool.ruff]
+src = ["src"]
+line-length = 99
+target-version = "py313"
+show-fixes = true
+output-format = "full"
+
+[tool.ruff.lint]
+# Refer to https://docs.astral.sh/ruff/rules/ to see the full list of rules and their codes.
+# Or just follow the error messages ruff gives you. :)
+select = [
+    "A",      # builtins
+    "BLE001", # blind-except
+    "B",      # bugbear
+    "C4",     # comprehensions
+    "C90",    # mccabe - complexity checker
+    "DTZ",    # datetimez
+    "D100",   # missing docstring in public module
+    "D101",   # missing docstring in public class
+    "D102",   # missing docstring in public method
+    "D206",   # docstring indentation
+    "D207",
+    "D208",
+    "D209",
+    "D210",
+    "E",      # pycodestyle errors
+    "EXE",    # executable
+    "FIX",    # fixme
+    "F",      # pyflakes
+    "ISC",    # implicit-str-concat
+    "I",      # isort
+    "INP",    # no-pep420
+    "LOG",    # logging
+    "N",      # pep8-naming
+    "PERF",   # perflint
+    "PTH",    # use-pathlib
+    "PIE",    # pie
+    "Q",      # quotes
+    "RUF",    # ruff-specific
+    "RET",    # return
+    "S",      # bandit
+    "SIM",    # simplify
+    "UP",     # pyupgrade
+    "W"       # pycodestyle warnings
+]
+ignore = [
+    "S101", # assert
+    "RUF003" # hyphens
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+docstring-code-line-length = 79
