@@ -57,5 +57,61 @@ class Interpreter:
         Executes the currently loaded program, using the provided input stream as standard input.
         """
         logger.info("Executing program")
-        # TODO: Your logic goes here.
 
+        # implementation of python interpreter
+        
+        # --- Guard: program must be loaded before execution (error code 99) ---
+        if self.current_program is None:
+            raise InterpreterError(ErrorCode.GENERAL_OTHER, "Program was not loaded")
+ 
+
+        # --- Static check: no duplicate class definitions (error code 35) ---
+        have_seen = set()
+
+        for cls in self.current_program.classes:
+            if cls.name in have_seen:
+                raise InterpreterError(ErrorCode.SEM_ERROR, f"The class '{cls.name}' was defined more than once")
+            have_seen.add(cls.name)
+
+
+        # --- Static check: class Main with method run must exist (error code 31) ---
+        main_class = None
+        for cls in self.current_program.classes:
+            if cls.name == "Main":
+                main_class = cls
+                break
+
+        if main_class is None:
+            raise InterpreterError(ErrorCode.SEM_MAIN, "The 'Main' class is missing")
+
+        method_run = None
+        for meth in main_class.methods:
+            if meth.selector == "run":
+                method_run = meth
+                break        
+                    
+        if method_run is None:
+            raise InterpreterError(ErrorCode.SEM_MAIN, "The 'Main' class is missing 'run' method")
+
+
+        # --- Static check: method selector arity must match block arity (error 33) ---
+        for cls in self.current_program.classes:
+            for meth in cls.methods:
+                params_count = meth.selector.count(":")
+                if meth.block.arity != params_count:
+                    raise InterpreterError(ErrorCode.SEM_ARITY, f"Arity mismatch occured in method '{meth.selector}'")
+                
+        
+        # --- Static check: assignment to block parameter is forbidden (error 34) ---
+        for cls in self.current_program.classes:
+            for meth in cls.methods:
+                params_names = []
+                for param in meth.block.parameters:
+                    params_names.append(param.name)
+                
+                for assign in meth.block.assigns:
+                    if assign.target.name in params_names:
+                        raise InterpreterError(ErrorCode.SEM_COLLISION, f"Assignment to parameter '{assign.target.name}' is not allowed, read-only")
+                    
+                    
+                    
