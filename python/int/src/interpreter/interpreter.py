@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from interpreter.error_codes import ErrorCode
 from interpreter.exceptions import InterpreterError
-from interpreter.input_model import Program
+from interpreter.input_model import Program, ClassDef, Method, Block
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,20 @@ class Runtime:
         self.block_class.parent = self.object_class
         self.classes["Block"] = self.block_class
 
+    def load_user_classes(self, classes: list[ClassDef]) -> None:
+        for cls in classes:
+            sol_class = SolClass(cls.name)
+            self.classes[cls.name] = sol_class
 
+        for cls in classes:
+            if cls.parent in self.classes:
+                self.classes[cls.name].parent = self.classes[cls.parent]
+            else:
+                raise InterpreterError(ErrorCode.SEM_UNDEF, f"The parent class '{cls.parent}' of '{cls.name}' was not defined")
+            
+        for cls in classes:
+            for meth in cls.methods:
+                self.classes[cls.name].methods[meth.selector] = meth.block
 
 
 
@@ -185,4 +198,6 @@ class Interpreter:
                         raise InterpreterError(ErrorCode.SEM_COLLISION, f"Assignment to parameter '{assign.target.name}' is not allowed, read-only")
                     
                     
-                    
+        # load data
+        runtime = Runtime(input_io)
+        runtime.load_user_classes(self.current_program.classes)
