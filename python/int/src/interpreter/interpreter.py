@@ -9,7 +9,8 @@ Author:
 
 import logging
 from pathlib import Path
-from typing import TextIO
+from typing import TextIO, Any
+from __future__ import annotations
 
 from lxml import etree
 from lxml.etree import ParseError
@@ -20,6 +21,35 @@ from interpreter.exceptions import InterpreterError
 from interpreter.input_model import Program
 
 logger = logging.getLogger(__name__)
+
+# definitions of classes for interpreter
+class SolObject:
+    def __init__(self) -> None:
+        self.sol_class: Any = None
+        self.attributes: dict = {}
+
+class SolClass:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.parent: SolClass | None = None
+        self.methods: dict = {}
+
+class Environment:
+    def __init__(self, parent: Environment | None = None) -> None:
+        self.variables: dict = {}
+        self.parent = parent
+
+    def get(self, name: str) -> Any:
+        if name in self.variables:
+            return self.variables[name]
+        if self.parent is not None:
+            return self.parent.get(name)
+        
+        raise InterpreterError(ErrorCode.SEM_UNDEF, f"Variable '{name}' was not defined")
+
+    def set(self, name: str, value: Any) -> None:
+        self.variables[name] = value
+
 
 
 class Interpreter:
