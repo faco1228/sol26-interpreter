@@ -4,13 +4,13 @@ This module contains the main logic of the interpreter.
 IPP: You must definitely modify this file. Bend it to your will.
 
 Author: Ondřej Ondryáš <iondryas@fit.vut.cz>
-Author:
+Author: Samuel Fačka <xfackas00>
 """
 
+from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import TextIO, Any
-from __future__ import annotations
 
 from lxml import etree
 from lxml.etree import ParseError
@@ -26,17 +26,17 @@ logger = logging.getLogger(__name__)
 class SolObject:
     def __init__(self) -> None:
         self.sol_class: Any = None
-        self.attributes: dict = {}
+        self.attributes: dict[str, Any] = {}
 
 class SolClass:
     def __init__(self, name: str) -> None:
         self.name = name
         self.parent: SolClass | None = None
-        self.methods: dict = {}
+        self.methods: dict[str, Any] = {}
 
 class Environment:
     def __init__(self, parent: Environment | None = None) -> None:
-        self.variables: dict = {}
+        self.variables: dict[str, Any] = {}
         self.parent = parent
 
     def get(self, name: str) -> Any:
@@ -49,6 +49,47 @@ class Environment:
 
     def set(self, name: str, value: Any) -> None:
         self.variables[name] = value
+
+# build-in classes
+class Runtime:
+    def __init__(self, input_io: TextIO) -> None:
+        self.classes: dict[str, SolClass] = {}
+        self.input_io = input_io
+
+        self._init_builtin_classes()
+
+    def _init_builtin_classes(self) -> None:
+        self.object_class = SolClass("Object")
+        self.object_class.parent = None
+        self.classes["Object"] = self.object_class
+
+        self.nil_class = SolClass("Nil")
+        self.nil_class.parent = self.object_class
+        self.classes["Nil"] = self.nil_class
+
+
+        self.true_class = SolClass("True")
+        self.true_class.parent = self.object_class
+        self.classes["True"] = self.true_class
+
+        self.false_class = SolClass("False")
+        self.false_class.parent = self.object_class
+        self.classes["False"] = self.false_class
+
+        self.int_class = SolClass("Integer")
+        self.int_class.parent = self.object_class
+        self.classes["Integer"] = self.int_class
+
+        self.str_class = SolClass("String")
+        self.str_class.parent = self.object_class
+        self.classes["String"] = self.str_class
+
+        self.block_class = SolClass("Block")
+        self.block_class.parent = self.object_class
+        self.classes["Block"] = self.block_class
+
+
+
 
 
 
@@ -96,7 +137,7 @@ class Interpreter:
  
 
         # --- Static check: no duplicate class definitions (error code 35) ---
-        have_seen = set()
+        have_seen: set[str] = set()
 
         for cls in self.current_program.classes:
             if cls.name in have_seen:
