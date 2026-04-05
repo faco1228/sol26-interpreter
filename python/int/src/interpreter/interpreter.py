@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from interpreter.error_codes import ErrorCode
 from interpreter.exceptions import InterpreterError
-from interpreter.input_model import Program, ClassDef, Method, Block
+from interpreter.input_model import Program, ClassDef, Method, Block, Expr, Literal, Send
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ class Runtime:
 
         self._init_builtin_classes()
 
+    # method to initialize built-in classes and their inheritance
     def _init_builtin_classes(self) -> None:
         self.object_class = SolClass("Object")
         self.object_class.parent = None
@@ -88,6 +89,17 @@ class Runtime:
         self.block_class.parent = self.object_class
         self.classes["Block"] = self.block_class
 
+        # empty frames for literals
+        self.nil_frame = SolObject()
+        self.nil_frame.sol_class = self.nil_class
+
+        self.true_frame = SolObject()
+        self.true_frame.sol_class = self.true_class
+
+        self.false_frame = SolObject()
+        self.false_frame.sol_class = self.false_class
+    
+    # method to load user defined classes into runtime
     def load_user_classes(self, classes: list[ClassDef]) -> None:
         for cls in classes:
             sol_class = SolClass(cls.name)
@@ -103,8 +115,112 @@ class Runtime:
             for meth in cls.methods:
                 self.classes[cls.name].methods[meth.selector] = meth.block
 
+    # method to execute a method with given block, arguments, environment and self object
+    def execute_method(self, block: Block, args: list[SolObject], env: Environment, self_obj: SolObject) -> SolObject | None:
+        # new env
+        new_env = Environment(parent=env)
 
+        for param, arg in zip(block.parameters, args):
+            new_env.set(param.name, arg)
+        
+        result = None
+        for assign in block.assigns:
+            value = self.eval_expression(assign.expr, new_env, self_obj)
+            if assign.target.name != "_":
+                new_env.set(assign.target.name, value)
+            result = value
+        
+        return result
+    
+    # method to evaluate an expression in given environment and self object
+    def eval_expression(self, expr: Expr, env: Environment, self_obj: SolObject) -> SolObject:
+        if expr.literal is not None:
+            return self.eval_literal(expr.literal)
+        if expr.var is not None:
+            return env.get(expr.var.name)
+        if expr.block is not None:
+            return self.eval_block_lit(expr.block, env, self_obj)
+        if expr.send is not None:
+            return self.eval_send(expr.send, env, self_obj) 
+        
+        raise InterpreterError(ErrorCode.GENERAL_OTHER, "Invalid expression")
+    
+    def eval_literal(self, literal: Literal) -> SolObject:
+        obj = SolObject()
 
+        if literal.class_id == "Integer":
+            obj.sol_class = self.classes["Integer"]
+            obj.attributes["__value__"] = int(literal.value)
+
+        elif literal.class_id == "String":
+            obj.sol_class = self.classes["String"]
+            obj.attributes["__value__"] = literal.value
+
+        elif literal.class_id == "Nil":
+            return self.nil_frame
+        
+        elif literal.class_id == "True":
+            return self.true_frame
+        
+        elif literal.class_id == "False":
+            return self.false_frame
+        
+        else:
+            raise InterpreterError(ErrorCode.GENERAL_OTHER, f"Unknown literal type '{literal.class_id}'")
+        
+        return obj
+    
+    def eval_block_lit(self, block: Block, env: Environment, self_obj: SolObject) -> SolObject:
+        obj = SolObject()
+
+        obj.sol_class = self.block_class
+        obj.attributes["__block__"] = block
+        obj.attributes["__env__"] = env
+        obj.attributes["__self__"] = self_obj
+
+        return obj
+    
+    def eval_send(self, send: Send, env: Environment, self_obj: SolObject) -> SolObject:
+        # evaluate recriver
+        receiver = self.eval_expression(send.receiver, env, self_obj)
+
+        # evaluate args
+        args = []
+        for arg in send.args:
+            args.append(self.eval_expression(arg.expr, env, self_obj))
+
+        # find and call coressponding method
+        return self.send_message(receiver, send.selector, args, env)
+    
+    def send_message(self, receiver: SolObject, selector: str, args: list[SolObject], env: Environment) -> SolObject:
+        # search for method in class and parent classes
+        sol_class: SolClass | None = receiver.sol_class
+        while sol_class is not None:
+            if selector in sol_class.methods:
+                method = sol_class.methods[selector]
+                if callable(method):
+                    return method(receiver, args, self)
+                else:
+                    raise self.execute_method(method, args, env, receiver)
+            sol_class = sol_class.parent
+
+        # if args are empty (dont have params), read atributes
+        if len(args) == 0 and selector in receiver.attributes:
+            return receiver.attributes[selector]
+        
+        # if args has only 1 element, set atribute
+        if len(args) == 1:
+            atribute_name = selector[:-1]
+            check_class: SolClass | None = receiver.sol_class
+            while check_class is not None:
+                # check for collision with method
+                if atribute_name in check_class.methods:
+                    raise InterpreterError(ErrorCode.INT_INST_ATTR, f"Atribute '{atribute_name}' have collision with method")
+                check_class = check_class.parent
+            receiver.attributes[atribute_name] = args[0]
+            return receiver
+
+        raise InterpreterError(ErrorCode.INT_DNU, f"Receiver of class '{receiver.sol_class.name}' does not understand the message '{selector}' with {len(args)} arguments")
 
 class Interpreter:
     """
@@ -201,3 +317,14 @@ class Interpreter:
         # load data
         runtime = Runtime(input_io)
         runtime.load_user_classes(self.current_program.classes)
+
+        # instance Main
+        main_object = SolObject()
+        main_object.sol_class = runtime.classes["Main"]
+
+        # empty environment
+        env = Environment()
+
+        # call methon 'run'
+        run_block = runtime.classes["Main"].methods["run"]
+        runtime.execute_method(run_block, [], env, main_object)
