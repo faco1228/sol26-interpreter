@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # definitions of classes for interpreter
 class SolObject:
     def __init__(self) -> None:
-        self.sol_class: Any = None
+        self.sol_class: SolClass | None = None
         self.attributes: dict[str, Any] = {}
 
 class SolClass:
@@ -33,6 +33,7 @@ class SolClass:
         self.name = name
         self.parent: SolClass | None = None
         self.methods: dict[str, Any] = {}
+        self.class_methods: dict[str, Any] = {}
 
 class Environment:
     def __init__(self, parent: Environment | None = None) -> None:
@@ -50,6 +51,12 @@ class Environment:
     def set(self, name: str, value: Any) -> None:
         self.variables[name] = value
 
+# wrapper for super - same object as self but method lookup starts in parent class
+class SuperWrapper:
+    def __init__(self, obj: SolObject, start_cls: SolClass) -> None:
+        self.obj = obj
+        self.start_cls = start_cls
+
 # build-in classes
 class Runtime:
     def __init__(self, input_io: TextIO) -> None:
@@ -60,6 +67,7 @@ class Runtime:
 
     # method to initialize built-in classes and their inheritance
     def _init_builtin_classes(self) -> None:
+
         self.object_class = SolClass("Object")
         self.object_class.parent = None
         self.classes["Object"] = self.object_class
@@ -67,7 +75,6 @@ class Runtime:
         self.nil_class = SolClass("Nil")
         self.nil_class.parent = self.object_class
         self.classes["Nil"] = self.nil_class
-
 
         self.true_class = SolClass("True")
         self.true_class.parent = self.object_class
@@ -98,7 +105,60 @@ class Runtime:
 
         self.false_frame = SolObject()
         self.false_frame.sol_class = self.false_class
-    
+
+        def builtin_string_print(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            value = reciever.attributes.get("__value__", "")
+            print(value, end="", flush = True)
+            return reciever
+
+        self.str_class.methods["print"] = builtin_string_print
+
+        def builtin_new(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            obj = SolObject()
+            obj.sol_class = reciever.sol_class
+            if reciever.sol_class.name == "Integer":
+                obj.attributes["__value__"] = 0
+            if reciever.sol_class.name == "String":
+                obj.attributes["__value__"] = ""
+            return obj
+        
+        def builtin_from(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            arg = args[0]
+            obj = SolObject()
+            obj.sol_class = reciever.sol_class
+            obj.attributes = dict(arg.attributes)
+            return obj
+        
+        def builtin_str_read(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            line = runtime.input_io.readline()
+            line = line.rstrip("\n")
+            obj = SolObject()
+            obj.sol_class = runtime.str_class
+            obj.attributes["__value__"] = line
+            return obj
+        
+        self.object_class.class_methods["new"] = builtin_new
+        self.object_class.class_methods["from:"] = builtin_from
+        self.str_class.class_methods["read"] = builtin_str_read
+
+        def builtin_identical(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if reciever is args[0]:
+                return self.true_frame
+            else:
+                return self.false_frame
+        
+        def builtin_equal(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if "__value__" not in reciever.attributes:
+                return builtin_identical(reciever, args, runtime)
+            if reciever.attributes["__value__"] == args[0].attributes.get("__value__"):
+                return self.true_frame
+            return self.false_frame
+        
+        self.object_class.methods["identicalTo:"] = builtin_identical
+        self.object_class.methods["equalTo:"] = builtin_equal
+
+
+
     # method to load user defined classes into runtime
     def load_user_classes(self, classes: list[ClassDef]) -> None:
         for cls in classes:
@@ -133,10 +193,21 @@ class Runtime:
         return result
     
     # method to evaluate an expression in given environment and self object
-    def eval_expression(self, expr: Expr, env: Environment, self_obj: SolObject) -> SolObject:
+    def eval_expression(self, expr: Expr, env: Environment, self_obj: SolObject) -> SolObject | SuperWrapper:
         if expr.literal is not None:
             return self.eval_literal(expr.literal)
         if expr.var is not None:
+            name = expr.var.name
+            if name == "self":
+                return self_obj
+            if name == "nil":
+                return self.nil_frame
+            if name == "true":
+                return self.true_frame
+            if name == "false":
+                return self.false_frame
+            if name == "super":
+                return SuperWrapper(self_obj, self_obj.sol_class)
             return env.get(expr.var.name)
         if expr.block is not None:
             return self.eval_block_lit(expr.block, env, self_obj)
@@ -166,7 +237,12 @@ class Runtime:
             return self.false_frame
         
         else:
-            raise InterpreterError(ErrorCode.GENERAL_OTHER, f"Unknown literal type '{literal.class_id}'")
+            if literal.class_id in self.classes:
+                class_obj = SolObject()
+                class_obj.sol_class = self.classes[literal.class_id]
+                class_obj.attributes["__is_class__"] = True
+                return class_obj
+            raise InterpreterError(ErrorCode.SEM_UNDEF, f"Unknown class '{literal.class_id}'")
         
         return obj
     
@@ -192,35 +268,50 @@ class Runtime:
         # find and call coressponding method
         return self.send_message(receiver, send.selector, args, env)
     
-    def send_message(self, receiver: SolObject, selector: str, args: list[SolObject], env: Environment) -> SolObject:
+    def send_message(self, receiver: SolObject | SuperWrapper, selector: str, args: list[SolObject], env: Environment) -> SolObject:
+        # devide super from normal object
+        if isinstance(receiver, SuperWrapper):
+            actual_obj = receiver.obj
+            start_cls: SolClass | None = receiver.start_cls.parent
+        else:
+            actual_obj = receiver
+            start_cls = receiver.sol_class
+
+        # class message handling
+        if actual_obj.attributes.get("__is_class__"):
+            sol_cls = actual_obj.sol_class
+            if selector in sol_cls.class_methods:
+                return sol_cls.class_methods[selector](actual_obj, args, self)
+            raise InterpreterError(ErrorCode.SEM_UNDEF, f"Unknown class method '{selector}' on class '{sol_cls.name}'")
+
         # search for method in class and parent classes
-        sol_class: SolClass | None = receiver.sol_class
+        sol_class = start_cls
         while sol_class is not None:
             if selector in sol_class.methods:
                 method = sol_class.methods[selector]
                 if callable(method):
-                    return method(receiver, args, self)
+                    return method(actual_obj, args, self)
                 else:
-                    raise self.execute_method(method, args, env, receiver)
+                    return self.execute_method(method, args, env, actual_obj)
             sol_class = sol_class.parent
 
         # if args are empty (dont have params), read atributes
-        if len(args) == 0 and selector in receiver.attributes:
-            return receiver.attributes[selector]
+        if len(args) == 0 and selector in actual_obj.attributes:
+            return actual_obj.attributes[selector]
         
         # if args has only 1 element, set atribute
         if len(args) == 1:
             atribute_name = selector[:-1]
-            check_class: SolClass | None = receiver.sol_class
+            check_class: SolClass | None = actual_obj.sol_class
             while check_class is not None:
                 # check for collision with method
                 if atribute_name in check_class.methods:
                     raise InterpreterError(ErrorCode.INT_INST_ATTR, f"Atribute '{atribute_name}' have collision with method")
                 check_class = check_class.parent
-            receiver.attributes[atribute_name] = args[0]
-            return receiver
+            actual_obj.attributes[atribute_name] = args[0]
+            return actual_obj
 
-        raise InterpreterError(ErrorCode.INT_DNU, f"Receiver of class '{receiver.sol_class.name}' does not understand the message '{selector}' with {len(args)} arguments")
+        raise InterpreterError(ErrorCode.INT_DNU, f"Receiver of class '{actual_obj.sol_class.name}' does not understand the message '{selector}' with {len(args)} arguments")
 
 class Interpreter:
     """
@@ -258,12 +349,47 @@ class Interpreter:
         """
         logger.info("Executing program")
 
+        BUILTIN_CLASSES_NAMES = frozenset(["Object", "Nil", "True", "False", "Integer", "String", "Block"])
+
+        # local helper functions/methods for Interpreter
+
+        def check_block(block: Block, params: set[str]) -> None:
+            # duplicate parameters in this block (error code 35)
+            params_set = set()
+            for param in block.parameters:
+                if param.name in params_set:
+                    raise InterpreterError(ErrorCode.SEM_ERROR, f"Duplicate parameter '{param.name}' in block")
+                params_set.add(param.name)
+            
+            all_params = params | params_set
+
+            # assignment to block parameter (error code 34)
+            for assign in block.assigns:
+                if assign.target.name in all_params:
+                    raise InterpreterError(ErrorCode.SEM_COLLISION, f"Assignment to parameter '{assign.target.name}' is not allowed, read-only")
+                check_expr(assign.expr, all_params)
+        
+        def check_expr(expr: Expr, params: set[str]) -> None:
+            if expr.block is not None:
+                check_block(expr.block, params)
+            if expr.send is not None:
+                check_expr(expr.send.receiver, params)
+                for arg in expr.send.args:
+                    check_expr(arg.expr, params)
+
+
         # implementation of python interpreter
         
         # --- Guard: program must be loaded before execution (error code 99) ---
         if self.current_program is None:
             raise InterpreterError(ErrorCode.GENERAL_OTHER, "Program was not loaded")
  
+
+        # check for redifinition of built-in classes (error code 35)
+        for cls in self.current_program.classes:
+            if cls.name in BUILTIN_CLASSES_NAMES:
+                raise InterpreterError(ErrorCode.SEM_ERROR, f"Redefinition of built-in class '{cls.name}' is not allowed")
+
 
         # --- Static check: no duplicate class definitions (error code 35) ---
         have_seen: set[str] = set()
@@ -301,18 +427,39 @@ class Interpreter:
                 if meth.block.arity != params_count:
                     raise InterpreterError(ErrorCode.SEM_ARITY, f"Arity mismatch occured in method '{meth.selector}'")
                 
-        
-        # --- Static check: assignment to block parameter is forbidden (error 34) ---
+
+        # --- Static checks: duplicate parameters (35) and assignment to parameter (34) ---
         for cls in self.current_program.classes:
             for meth in cls.methods:
-                params_names = []
-                for param in meth.block.parameters:
-                    params_names.append(param.name)
+                check_block(meth.block, set())
+
+        
+        # --- Static check: duplicate class methods (error code 35) ---
+        for cls in self.current_program.classes:
+            have_seen: set[str] = set()
+            for meth in cls.methods:
+                if meth.selector in have_seen:
+                    raise InterpreterError(ErrorCode.SEM_ERROR, f"Duplicate method selector '{meth.selector}' in class '{cls.name}'")
+                have_seen.add(meth.selector)
+
+        
                 
-                for assign in meth.block.assigns:
-                    if assign.target.name in params_names:
-                        raise InterpreterError(ErrorCode.SEM_COLLISION, f"Assignment to parameter '{assign.target.name}' is not allowed, read-only")
-                    
+        # -- Static check: cyclic inheritance (error code 35) ---
+        user_classes: set[str] = set() 
+        parent_map: dict[str, str] = {}
+        for cls in self.current_program.classes:
+            user_classes.add(cls.name)
+            parent_map[cls.name] = cls.parent
+
+        for cls in self.current_program.classes:
+            visited: set[str] = set()
+            current_cls = cls.name
+            while current_cls in user_classes:
+                if current_cls in visited:
+                    raise InterpreterError(ErrorCode.SEM_ERROR, f"Cyclic inheritance detected involving class '{current_cls}'")
+                visited.add(current_cls)
+                current_cls = parent_map[current_cls]
+
                     
         # load data
         runtime = Runtime(input_io)
