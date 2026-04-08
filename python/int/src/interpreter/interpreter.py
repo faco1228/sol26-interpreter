@@ -22,7 +22,10 @@ from interpreter.input_model import Program, ClassDef, Method, Block, Expr, Lite
 
 logger = logging.getLogger(__name__)
 
-# definitions of classes for interpreter
+# =============================================================================
+# RUNTIME OBJECT MODEL
+# =============================================================================
+
 class SolObject:
     def __init__(self) -> None:
         self.sol_class: SolClass | None = None
@@ -51,13 +54,16 @@ class Environment:
     def set(self, name: str, value: Any) -> None:
         self.variables[name] = value
 
-# wrapper for super - same object as self but method lookup starts in parent class
+# wrapper for super — same object as self, but method lookup starts in parent class
 class SuperWrapper:
     def __init__(self, obj: SolObject, start_cls: SolClass) -> None:
         self.obj = obj
         self.start_cls = start_cls
 
-# build-in classes
+# =============================================================================
+# RUNTIME ENGINE
+# =============================================================================
+
 class Runtime:
     def __init__(self, input_io: TextIO) -> None:
         self.classes: dict[str, SolClass] = {}
@@ -68,6 +74,7 @@ class Runtime:
     # method to initialize built-in classes and their inheritance
     def _init_builtin_classes(self) -> None:
 
+        # --- Class hierarchy ---
         self.object_class = SolClass("Object")
         self.object_class.parent = None
         self.classes["Object"] = self.object_class
@@ -96,7 +103,7 @@ class Runtime:
         self.block_class.parent = self.object_class
         self.classes["Block"] = self.block_class
 
-        # empty frames for literals
+        # --- Singleton instances (nil, true, false) ---
         self.nil_frame = SolObject()
         self.nil_frame.sol_class = self.nil_class
 
@@ -106,6 +113,7 @@ class Runtime:
         self.false_frame = SolObject()
         self.false_frame.sol_class = self.false_class
 
+        # --- String instance methods ---
         def builtin_string_print(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
             value = reciever.attributes.get("__value__", "")
             print(value, end="", flush = True)
@@ -113,6 +121,7 @@ class Runtime:
 
         self.str_class.methods["print"] = builtin_string_print
 
+        # --- Class methods (new, from:, read) ---
         def builtin_new(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
             obj = SolObject()
             obj.sol_class = reciever.sol_class
@@ -141,6 +150,7 @@ class Runtime:
         self.object_class.class_methods["from:"] = builtin_from
         self.str_class.class_methods["read"] = builtin_str_read
 
+        # --- Object instance methods ---
         def builtin_identical(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
             if reciever is args[0]:
                 return self.true_frame
@@ -157,6 +167,57 @@ class Runtime:
         self.object_class.methods["identicalTo:"] = builtin_identical
         self.object_class.methods["equalTo:"] = builtin_equal
 
+        # helper function to check if object is instance of the class or its subclass
+        def is_instance(obj: SolObject, cls: str, runtime: Runtime) -> bool:
+            current_cls = obj.sol_class
+            while current_cls is not None:
+                if current_cls.name == cls:
+                    return True
+                current_cls = current_cls.parent
+            return False
+
+        def builtin_as_str(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            obj = SolObject()
+            obj.sol_class = runtime.str_class
+            obj.attributes["__value__"] = ""
+            return obj
+        
+        def builtin_is_nil(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if is_instance(reciever, "Nil", runtime): #
+                return self.true_frame
+            else:
+                return self.false_frame
+        
+        def builtin_is_number(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if is_instance(reciever, "Integer", runtime): #
+                return self.true_frame 
+            else:
+                return self.false_frame
+            
+        def builtin_is_string(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if is_instance(reciever, "String", runtime): # 
+                return self.true_frame
+            else:
+                return self.false_frame
+            
+        def builtin_is_block(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if is_instance(reciever, "Block", runtime): #
+                return self.true_frame
+            else:
+                return self.false_frame
+        
+        def builtin_is_bool(reciever: SolObject, args: list[SolObject], runtime: Runtime) -> SolObject:
+            if is_instance(reciever, "True", runtime) or is_instance(reciever, "False", runtime): #
+                return self.true_frame
+            else:
+                return self.false_frame
+            
+        self.object_class.methods["asString"] = builtin_as_str
+        self.object_class.methods["isNil"] = builtin_is_nil
+        self.object_class.methods["isNumber"] = builtin_is_number
+        self.object_class.methods["isString"] = builtin_is_string
+        self.object_class.methods["isBlock"] = builtin_is_block
+        self.object_class.methods["isBoolean"] = builtin_is_bool
 
 
     # method to load user defined classes into runtime
@@ -176,16 +237,16 @@ class Runtime:
                 self.classes[cls.name].methods[meth.selector] = meth.block
 
     # method to execute a method with given block, arguments, environment and self object
-    def execute_method(self, block: Block, args: list[SolObject], env: Environment, self_obj: SolObject) -> SolObject | None:
+    def execute_method(self, block: Block, args: list[SolObject], env: Environment, self_obj: SolObject, current_cls: SolClass | None = None) -> SolObject:
         # new env
         new_env = Environment(parent=env)
 
         for param, arg in zip(block.parameters, args):
             new_env.set(param.name, arg)
         
-        result = None
+        result = self.nil_frame
         for assign in block.assigns:
-            value = self.eval_expression(assign.expr, new_env, self_obj)
+            value = self.eval_expression(assign.expr, new_env, self_obj, current_cls)
             if assign.target.name != "_":
                 new_env.set(assign.target.name, value)
             result = value
@@ -193,7 +254,7 @@ class Runtime:
         return result
     
     # method to evaluate an expression in given environment and self object
-    def eval_expression(self, expr: Expr, env: Environment, self_obj: SolObject) -> SolObject | SuperWrapper:
+    def eval_expression(self, expr: Expr, env: Environment, self_obj: SolObject, current_cls: SolClass | None = None) -> SolObject | SuperWrapper:
         if expr.literal is not None:
             return self.eval_literal(expr.literal)
         if expr.var is not None:
@@ -207,12 +268,16 @@ class Runtime:
             if name == "false":
                 return self.false_frame
             if name == "super":
-                return SuperWrapper(self_obj, self_obj.sol_class)
+                if current_cls is not None:
+                    cls = current_cls
+                else:
+                    cls = self_obj.sol_class
+                return SuperWrapper(self_obj, cls)
             return env.get(expr.var.name)
         if expr.block is not None:
             return self.eval_block_lit(expr.block, env, self_obj)
         if expr.send is not None:
-            return self.eval_send(expr.send, env, self_obj) 
+            return self.eval_send(expr.send, env, self_obj, current_cls) 
         
         raise InterpreterError(ErrorCode.GENERAL_OTHER, "Invalid expression")
     
@@ -256,14 +321,14 @@ class Runtime:
 
         return obj
     
-    def eval_send(self, send: Send, env: Environment, self_obj: SolObject) -> SolObject:
+    def eval_send(self, send: Send, env: Environment, self_obj: SolObject, current_cls: SolClass | None = None) -> SolObject:
         # evaluate recriver
-        receiver = self.eval_expression(send.receiver, env, self_obj)
+        receiver = self.eval_expression(send.receiver, env, self_obj, current_cls)
 
         # evaluate args
         args = []
         for arg in send.args:
-            args.append(self.eval_expression(arg.expr, env, self_obj))
+            args.append(self.eval_expression(arg.expr, env, self_obj, current_cls))
 
         # find and call coressponding method
         return self.send_message(receiver, send.selector, args, env)
@@ -279,10 +344,12 @@ class Runtime:
 
         # class message handling
         if actual_obj.attributes.get("__is_class__"):
-            sol_cls = actual_obj.sol_class
-            if selector in sol_cls.class_methods:
-                return sol_cls.class_methods[selector](actual_obj, args, self)
-            raise InterpreterError(ErrorCode.SEM_UNDEF, f"Unknown class method '{selector}' on class '{sol_cls.name}'")
+            sol_cls: SolClass | None = actual_obj.sol_class
+            while sol_cls is not None:
+                if selector in sol_cls.class_methods:
+                    return sol_cls.class_methods[selector](actual_obj, args, self)
+                sol_cls = sol_cls.parent
+            raise InterpreterError(ErrorCode.SEM_UNDEF, f"Unknown class method '{selector}' on class '{actual_obj.sol_class.name}'")
 
         # search for method in class and parent classes
         sol_class = start_cls
@@ -292,7 +359,7 @@ class Runtime:
                 if callable(method):
                     return method(actual_obj, args, self)
                 else:
-                    return self.execute_method(method, args, env, actual_obj)
+                    return self.execute_method(method, args, env, actual_obj, sol_class)
             sol_class = sol_class.parent
 
         # if args are empty (dont have params), read atributes
@@ -312,6 +379,10 @@ class Runtime:
             return actual_obj
 
         raise InterpreterError(ErrorCode.INT_DNU, f"Receiver of class '{actual_obj.sol_class.name}' does not understand the message '{selector}' with {len(args)} arguments")
+
+# =============================================================================
+# INTERPRETER ENTRY POINT
+# =============================================================================
 
 class Interpreter:
     """
