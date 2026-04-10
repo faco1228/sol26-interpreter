@@ -3,8 +3,9 @@ name = "sol26-interpreter"
 version = "1.0.0"
 description = "An interpreter for SOL26, a simple object language."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
+    "lxml>=6.0.2",
     "pydantic~=2.12.5",
     "pydantic-xml[lxml]~=2.19.0",
     "types-lxml>=2026.2.16",
@@ -17,7 +18,7 @@ dev = [
 ]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 pretty = true
 show_error_context = true
@@ -33,7 +34,7 @@ plugins = [
 [tool.ruff]
 src = ["src"]
 line-length = 99
-target-version = "py313"
+target-version = "py314"
 show-fixes = true
 output-format = "full"
 
@@ -85,3 +86,7 @@ quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
 docstring-code-line-length = 79
+
+[tool.ruff.lint.mccabe]
+# Flag complexity errors (`C901`) whenever the complexity level exceeds 15.
+max-complexity = 15

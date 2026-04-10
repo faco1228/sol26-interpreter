@@ -1,0 +1,10 @@
++++ parse_only
+*** valid SOL26 source parses successfully
+!C! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    _ := 'hello' print.
+  ]
+}

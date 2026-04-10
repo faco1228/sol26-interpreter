@@ -1,0 +1,19 @@
++++ errors
+*** setting attribute that collides with method name causes error 54
+!C! 0
+!I! 54
+>>> 1
+
+class Foo : Object {
+  bar [ | _ := 'bar method'. ]
+  run [ |
+    _ := self bar: 'value'.
+  ]
+}
+
+class Main : Object {
+  run [ |
+    f := Foo new.
+    _ := f run.
+  ]
+}

@@ -1,0 +1,11 @@
++++ errors
+*** missing Main class returns exit 31
+!C! 0
+!I! 31
+>>> 1
+
+class Foo : Object {
+  run [ |
+    _ := 'no main' print.
+  ]
+}

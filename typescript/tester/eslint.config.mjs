@@ -17,7 +17,7 @@ export default defineConfig(
       }
     },
     rules: {
-      "complexity": ["error", 10],
+      "complexity": ["error", 15],
       "no-warning-comments": ["error", { "terms": ["fixme"], "location": "anywhere" }],
       "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
       "@typescript-eslint/no-explicit-any": "error",

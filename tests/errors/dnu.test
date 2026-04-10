@@ -1,0 +1,11 @@
++++ errors
+*** sending unknown message causes DNU error 51
+!C! 0
+!I! 51
+>>> 1
+
+class Main : Object {
+  run [ |
+    _ := 42 unknownMessage.
+  ]
+}

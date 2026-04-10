@@ -12,14 +12,23 @@
  */
 
 import { existsSync, lstatSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, basename } from "node:path";
 
 import { getLogger, LogLevel, setLogLevel } from "./logging.js";
 import { TestReport } from "./models.js";
 
+import {
+  TestCaseDefinition,
+  TestCaseReport,
+  UnexecutedReason,
+  UnexecutedReasonCode,
+} from "./models.js";
+import { discoverTests, parseTestFile } from "./test_parser.js";
+import { filterTests, runTest, buildReport } from "./test_runner.js";
+
 const logger = getLogger("main");
 
-interface CliArguments {
+export interface CliArguments {
   tests_dir: string;
   recursive: boolean;
   output: string | null;
@@ -32,6 +41,8 @@ interface CliArguments {
   exclude_test: string[] | null;
   verbose: number;
   regex_filters: boolean;
+  interpreter: string | null;
+  parser: string | null;
 }
 
 class CliArgumentParsingError extends Error {
@@ -54,6 +65,8 @@ interface ParserState {
   dryRun: boolean;
   regexFilters: boolean;
   verbose: number;
+  interpreter: string | null;
+  parser: string | null;
 }
 
 function writeResult(resultReport: TestReport, outputFile: string | null): void {
@@ -83,6 +96,8 @@ function createParserState(): ParserState {
     dryRun: false,
     regexFilters: false,
     verbose: 0,
+    interpreter: null,
+    parser: null,
   };
 }
 
@@ -146,13 +161,25 @@ function tryConsumeRequiredValueOption(
   index: number,
   state: ParserState
 ): number | null {
-  if (current !== "-o" && current !== "--output") {
-    return null;
+  if (current === "-o" || current === "--output") {
+    const [value, nextIndex] = readRequiredValue(argv, index, "--output");
+    state.output = value;
+    return nextIndex;
   }
 
-  const [value, nextIndex] = readRequiredValue(argv, index, "--output");
-  state.output = value;
-  return nextIndex;
+  if (current === "--interpreter" || current === "--int") {
+    const [value, nextIndex] = readRequiredValue(argv, index, "--interpreter");
+    state.interpreter = value;
+    return nextIndex;
+  }
+
+  if (current === "--parser" || current === "--par") {
+    const [value, nextIndex] = readRequiredValue(argv, index, "--parser");
+    state.parser = value;
+    return nextIndex;
+  }
+
+  return null;
 }
 
 function tryConsumeSingleListValueOption(
@@ -246,12 +273,50 @@ function consumeToken(argv: string[], index: number, state: ParserState): number
   return index + 1;
 }
 
+function nullIfEmpty(arr: string[]): string[] | null {
+  return arr.length > 0 ? arr : null;
+}
+
+function printHelp(): void {
+  console.log(`Usage: tester.js [options] tests_dir
+
+Options:
+  --interpreter, --int <path>         Path to the interpreter (optional)
+  --parser,      --par <path>         Path to the SOL2XML parser (optional)
+  -r, --recursive                     Discover tests recursively
+  -o, --output <file>                 Write report to file instead of stdout
+  --dry-run                           Discover and filter tests without running them
+  -i,  --include          [p...]      Include tests/categories matching patterns
+  -ic, --include-category [p...]      Include categories matching patterns
+  -it, --include-test     [p...]      Include tests matching patterns
+  -e,  --exclude          [p...]      Exclude tests/categories matching patterns
+  -ec, --exclude-category [p...]      Exclude categories matching patterns
+  -et, --exclude-test     <p>         Exclude test by name (repeatable)
+  -g                                  Treat filter patterns as regular expressions
+  -v, --verbose                       Increase verbosity (-v info, -vv debug)
+  -h, --help                          Show this help message`);
+}
+
+function expandEqualsArgs(argv: string[]): string[] {
+  const expanded: string[] = [];
+  for (const arg of argv) {
+    const eqIdx = arg.indexOf("=");
+    if (arg.startsWith("--") && eqIdx > 2) {
+      expanded.push(arg.slice(0, eqIdx), arg.slice(eqIdx + 1));
+    } else {
+      expanded.push(arg);
+    }
+  }
+  return expanded;
+}
+
 function parseCliArguments(argv: string[]): CliArguments {
   const state = createParserState();
+  const expanded = expandEqualsArgs(argv);
 
   let index = 0;
-  while (index < argv.length) {
-    index = consumeToken(argv, index, state);
+  while (index < expanded.length) {
+    index = consumeToken(expanded, index, state);
   }
 
   if (state.positionalArguments.length !== 1) {
@@ -268,14 +333,16 @@ function parseCliArguments(argv: string[]): CliArguments {
     recursive: state.recursive,
     output: state.output,
     dry_run: state.dryRun,
-    include: state.include.length > 0 ? state.include : null,
-    include_category: state.includeCategory.length > 0 ? state.includeCategory : null,
-    include_test: state.includeTest.length > 0 ? state.includeTest : null,
-    exclude: state.exclude.length > 0 ? state.exclude : null,
-    exclude_category: state.excludeCategory.length > 0 ? state.excludeCategory : null,
-    exclude_test: state.excludeTest.length > 0 ? state.excludeTest : null,
+    include: nullIfEmpty(state.include),
+    include_category: nullIfEmpty(state.includeCategory),
+    include_test: nullIfEmpty(state.includeTest),
+    exclude: nullIfEmpty(state.exclude),
+    exclude_category: nullIfEmpty(state.excludeCategory),
+    exclude_test: nullIfEmpty(state.excludeTest),
     verbose: state.verbose,
     regex_filters: state.regexFilters,
+    interpreter: state.interpreter,
+    parser: state.parser,
   };
 }
 
@@ -283,6 +350,11 @@ function parseArguments(): CliArguments {
   /**
    * Parses the command-line arguments and performs basic validation a sanitization.
    */
+  const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes("-h") || rawArgs.includes("--help")) {
+    printHelp();
+    process.exit(0);
+  }
 
   // Parse the provided arguments
   // argparse will automatically print an error message and exit with the return code 2
@@ -338,9 +410,49 @@ function main(): void {
   }
 
   // TODO: Your code for discovering and executing the test cases goes here.
+  // discover tests
+  const testPaths = discoverTests(args.tests_dir, args.recursive);
 
-  // Example of how to write the final report:
-  const report = new TestReport({ discovered_test_cases: [], unexecuted: {}, results: {} });
+  // parse test files
+  const allTests: TestCaseDefinition[] = [];
+  const unexecuted = new Map<string, UnexecutedReason>();
+
+  for (const testPath of testPaths) {
+    const parsed = parseTestFile(testPath);
+    if (parsed instanceof UnexecutedReason) {
+      const name = basename(testPath, ".test");
+      unexecuted.set(name, parsed);
+    } else {
+      allTests.push(parsed);
+    }
+  }
+
+  // filter tests
+  const { toRun, filtered } = filterTests(allTests, args);
+  for (const test of filtered) {
+    unexecuted.set(test.name, new UnexecutedReason(UnexecutedReasonCode.FILTERED_OUT));
+  }
+
+  // dry run - skip execution
+  if (args.dry_run) {
+    const report = buildReport(allTests, new Map(), unexecuted);
+    writeResult(report, args.output);
+    return;
+  }
+
+  // run tests
+  const results = new Map<string, { test: TestCaseDefinition; report: TestCaseReport }>();
+  for (const test of toRun) {
+    const result = runTest(test, args);
+    if (result instanceof UnexecutedReason) {
+      unexecuted.set(test.name, result);
+    } else {
+      results.set(test.name, { test, report: result });
+    }
+  }
+
+  // build and write report
+  const report = buildReport(allTests, results, unexecuted);
   writeResult(report, args.output);
 }
 

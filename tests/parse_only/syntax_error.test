@@ -1,0 +1,6 @@
++++ parse_only
+*** invalid SOL26 syntax causes parser error
+!C! 1
+>>> 1
+
+this is not valid sol26 syntax { {{ }

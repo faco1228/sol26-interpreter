@@ -1,0 +1,13 @@
++++ errors
+*** inheriting from undefined class causes error 32
+!C! 0
+!I! 32
+>>> 1
+
+class Foo : NonExistentParent {
+  run [ | _ := nil. ]
+}
+
+class Main : Object {
+  run [ | _ := nil. ]
+}

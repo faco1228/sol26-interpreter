@@ -1,0 +1,12 @@
++++ combined
+*** boolean ifTrue:ifFalse: branching
+!C! 0
+!I! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    b := 3 greaterThan: 2.
+    _ := b ifTrue: [:x | _ := 'yes' print.] ifFalse: [:x | _ := 'no' print.].
+  ]
+}

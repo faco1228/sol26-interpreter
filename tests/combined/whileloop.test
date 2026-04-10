@@ -1,0 +1,16 @@
++++ combined
+*** while loop counts 1 to 5
+!C! 0
+!I! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    i := 1.
+    _ := [ | b := i greaterThan: 5. r := b not. ] whileTrue: [ |
+      s := i asString.
+      _ := s print.
+      i := i plus: 1.
+    ].
+  ]
+}

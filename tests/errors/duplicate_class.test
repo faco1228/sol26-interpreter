@@ -1,0 +1,17 @@
++++ errors
+*** duplicate class definition causes error 35
+!C! 0
+!I! 35
+>>> 1
+
+class Foo : Object {
+  run [ | _ := nil. ]
+}
+
+class Foo : Object {
+  run [ | _ := nil. ]
+}
+
+class Main : Object {
+  run [ | _ := nil. ]
+}

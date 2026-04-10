@@ -1,0 +1,30 @@
++++ combined
+*** user-defined class with instance attributes and methods
+!C! 0
+!I! 0
+>>> 1
+
+class Counter : Object {
+  increment [ |
+    cur := self count.
+    nxt := cur plus: 1.
+    _ := self count: nxt.
+    _ := self.
+  ]
+  getCount [ |
+    _ := self count.
+  ]
+}
+
+class Main : Object {
+  run [ |
+    c := Counter new.
+    _ := c count: 0.
+    _ := c increment.
+    _ := c increment.
+    _ := c increment.
+    val := c getCount.
+    s := val asString.
+    _ := s print.
+  ]
+}

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
+    "start": "npm run build && node dist/tester.js",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "npm exec -- eslint \"src/**/*.ts\"",
     "format": "npm exec -- prettier --write \"src/**/*.ts\""
@@ -20,5 +21,9 @@
     "prettier": "~3.7.0",
     "typescript": "~5.9.0",
     "typescript-eslint": "~8.52.0"
+  },
+  "dependencies": {
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3"
   }
 }

@@ -1,0 +1,15 @@
++++ combined
+*** closure captures outer variable
+!C! 0
+!I! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    x := 10.
+    adder := [ :n | _ := n plus: x. ].
+    result := adder value: 5.
+    s := result asString.
+    _ := s print.
+  ]
+}

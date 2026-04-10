@@ -1,0 +1,12 @@
++++ combined
+*** reading a line from stdin and printing it
+!C! 0
+!I! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    line := String read.
+    _ := line print.
+  ]
+}

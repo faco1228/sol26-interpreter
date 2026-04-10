@@ -1,0 +1,12 @@
++++ combined
+*** string concatenation and length
+!C! 0
+!I! 0
+>>> 1
+
+class Main : Object {
+  run [ |
+    a := 'Hello' concatenateWith: ', World!'.
+    _ := a print.
+  ]
+}

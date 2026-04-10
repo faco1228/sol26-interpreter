@@ -1,0 +1,13 @@
++++ errors
+*** division by zero returns exit 53
+!C! 0
+!I! 53
+>>> 1
+
+class Main : Object {
+  run [ |
+    x := 10 divBy: 0.
+    _ := x asString.
+    _ := x print.
+  ]
+}

@@ -14,47 +14,68 @@ export enum TestCaseType {
   COMBINED = 2,
 }
 
-export interface TestCaseDefinitionInit {
+export interface TestCaseDefinitionFileInit {
   name: string;
+  test_source_path: string;
+  stdin_file?: string | null;
+  expected_stdout_file?: string | null;
+}
+
+export class TestCaseDefinitionFile {
+  /**
+   * Represents a single discovered test case file.
+   *
+   * IPP: This model may (or may not) be useful for your internal processing, or you may
+   *      choose to create your own internal models and only in the end create the final
+   *      TestCaseDefinition instances to include in the output report.
+   *
+   *      Do not modify this model directly, as it is used as the parent of the
+   *      TestCaseDefinition model, which is included in the output report.
+   */
+
+  public readonly name: string;
+  public readonly test_source_path: string;
+  public readonly stdin_file: string | null;
+  public readonly expected_stdout_file: string | null;
+
+  public constructor(init: TestCaseDefinitionFileInit) {
+    this.name = init.name;
+    this.test_source_path = init.test_source_path;
+    this.stdin_file = init.stdin_file ?? null;
+    this.expected_stdout_file = init.expected_stdout_file ?? null;
+  }
+}
+
+export interface TestCaseDefinitionInit extends TestCaseDefinitionFileInit {
   test_type: TestCaseType;
   description?: string | null;
   category: string;
   points?: number;
-  test_source_path: string;
-  stdin_file?: string | null;
-  expected_stdout_file?: string | null;
   expected_parser_exit_codes?: number[] | null;
   expected_interpreter_exit_codes?: number[] | null;
 }
 
-export class TestCaseDefinition {
+export class TestCaseDefinition extends TestCaseDefinitionFile {
   /**
-   * Represents a single discovered test case.
+   * Represents a single discovered test case (that was successfully parsed).
    *
    * IPP: Do not modify this model directly, as it is also used in the output report.
    *      You may create your own internal models derived from this one.
    */
 
-  public readonly name: string;
   public readonly test_type: TestCaseType;
   public readonly description: string | null;
   public readonly category: string;
   public readonly points: number;
-  public readonly test_source_path: string;
-  public readonly stdin_file: string | null;
-  public readonly expected_stdout_file: string | null;
   public readonly expected_parser_exit_codes: number[] | null;
   public readonly expected_interpreter_exit_codes: number[] | null;
 
   public constructor(init: TestCaseDefinitionInit) {
-    this.name = init.name;
+    super(init);
     this.test_type = init.test_type;
     this.description = init.description ?? null;
     this.category = init.category;
     this.points = init.points ?? 1;
-    this.test_source_path = init.test_source_path;
-    this.stdin_file = init.stdin_file ?? null;
-    this.expected_stdout_file = init.expected_stdout_file ?? null;
     this.expected_parser_exit_codes = init.expected_parser_exit_codes ?? null;
     this.expected_interpreter_exit_codes = init.expected_interpreter_exit_codes ?? null;
 
@@ -182,7 +203,7 @@ export class CategoryReport {
 }
 
 export interface TestReportInit {
-  discovered_test_cases: TestCaseDefinition[];
+  discovered_test_cases?: TestCaseDefinition[];
   unexecuted?: Record<string, UnexecutedReason>;
   results?: Record<string, CategoryReport> | null;
 }
@@ -195,7 +216,7 @@ export class TestReport {
   public readonly results: Record<string, CategoryReport> | null;
 
   public constructor(init: TestReportInit) {
-    this.discovered_test_cases = init.discovered_test_cases;
+    this.discovered_test_cases = init.discovered_test_cases ?? [];
     this.unexecuted = init.unexecuted ?? {};
     this.results = init.results ?? null;
   }

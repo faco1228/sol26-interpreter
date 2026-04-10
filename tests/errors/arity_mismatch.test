@@ -1,0 +1,14 @@
++++ errors
+*** method block arity differs from selector arity causes error 33
+!C! 0
+!I! 33
+>>> 1
+
+class Main : Object {
+  greet: [ :a :b |
+    _ := a print.
+  ]
+  run [ |
+    _ := self greet: 'world'.
+  ]
+}

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<program language="SOL26">
+  <class name="Main" parent="Object">
+    <method selector="run">
+      <block arity="0">
+        <assign order="1">
+          <var name="i"/>
+          <expr>
+            <literal class="Integer" value="1"/>
+          </expr>
+        </assign>
+        <assign order="2">
+          <var name="_"/>
+          <expr>
+            <send selector="whileTrue:">
+              <expr>
+                <block arity="0">
+                  <assign order="1">
+                    <var name="b"/>
+                    <expr>
+                      <send selector="greaterThan:">
+                        <expr>
+                          <var name="i"/>
+                        </expr>
+                        <arg order="1">
+                          <expr>
+                            <literal class="Integer" value="5"/>
+                          </expr>
+                        </arg>
+                      </send>
+                    </expr>
+                  </assign>
+                  <assign order="2">
+                    <var name="r"/>
+                    <expr>
+                      <send selector="not">
+                        <expr>
+                          <var name="b"/>
+                        </expr>
+                      </send>
+                    </expr>
+                  </assign>
+                </block>
+              </expr>
+              <arg order="1">
+                <expr>
+                  <block arity="0">
+                    <assign order="1">
+                      <var name="s"/>
+                      <expr>
+                        <send selector="asString">
+                          <expr>
+                            <var name="i"/>
+                          </expr>
+                        </send>
+                      </expr>
+                    </assign>
+                    <assign order="2">
+                      <var name="_"/>
+                      <expr>
+                        <send selector="print">
+                          <expr>
+                            <var name="s"/>
+                          </expr>
+                        </send>
+                      </expr>
+                    </assign>
+                    <assign order="3">
+                      <var name="i"/>
+                      <expr>
+                        <send selector="plus:">
+                          <expr>
+                            <var name="i"/>
+                          </expr>
+                          <arg order="1">
+                            <expr>
+                              <literal class="Integer" value="1"/>
+                            </expr>
+                          </arg>
+                        </send>
+                      </expr>
+                    </assign>
+                  </block>
+                </expr>
+              </arg>
+            </send>
+          </expr>
+        </assign>
+      </block>
+    </method>
+  </class>
+</program>
