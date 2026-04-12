@@ -1,7 +1,5 @@
-### podman
-
 # =============================================================================
-# check — quality tools for int (Python) and tester (TypeScript)
+# check — quality tools for interpreter (Python) and tester (TypeScript)
 # bind mounts: /src/int, /src/tester
 # =============================================================================
 FROM python:3.14-slim AS check
@@ -32,6 +30,10 @@ RUN cd /tmp/tester && \
     ln -s /node_modules/.bin/prettier /usr/local/bin/prettier && \
     rm -rf /tmp/tester
 
+# sol2xml parser + its deps (lxml already installed above via uv; only lark needed additionally)
+COPY tester/sol2xml/ /sol2xml/
+RUN pip install --no-cache-dir lark==1.2.2
+
 WORKDIR /src
 ENTRYPOINT ["bash"]
 
@@ -60,6 +62,8 @@ RUN cd /tmp/int && \
 
 WORKDIR /app
 COPY int/src ./src
+COPY tester/sol2xml/ /sol2xml/
+RUN pip install --no-cache-dir lark==1.2.2
 
 ENTRYPOINT ["python", "src/solint.py"]
 
@@ -76,4 +80,5 @@ RUN apt-get update && \
 COPY --from=build-test /build/dist         /app/tester/dist
 COPY --from=build-test /build/node_modules /app/tester/node_modules
 
-ENTRYPOINT ["node", "/app/tester/dist/tester.js"]
+# default to the bundled interpreter and parser so the tester works out of the box
+ENTRYPOINT ["node", "/app/tester/dist/tester.js", "--interpreter", "python /app/src/solint.py", "--parser", "python /sol2xml/sol_to_xml.py"]

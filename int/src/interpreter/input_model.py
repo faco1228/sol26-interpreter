@@ -83,7 +83,7 @@ class Expr(BaseXmlModel, tag="expr"):
         return self
 
 
-class Send(BaseXmlModel, tag="send"):
+class Send(BaseXmlModel, tag="send", search_mode="unordered"):
     """
     <send selector="...">
       <expr>...</expr>              # receiver expression (required)
@@ -104,7 +104,7 @@ class Send(BaseXmlModel, tag="send"):
         self.args = sort_by_order(self.args)
 
 
-class Assign(OrderedElementXmlModel, tag="assign"):
+class Assign(OrderedElementXmlModel, tag="assign", search_mode="unordered"):
     """
     <assign order="...">
       <var name="..."/>
@@ -116,7 +116,7 @@ class Assign(OrderedElementXmlModel, tag="assign"):
     expr: Expr = element(tag="expr")
 
 
-class Block(BaseXmlModel, tag="block"):
+class Block(BaseXmlModel, tag="block", search_mode="unordered"):
     """
     <block arity="...">
       <parameter name="..." order="..."/>
