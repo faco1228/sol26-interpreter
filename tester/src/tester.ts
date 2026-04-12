@@ -443,11 +443,16 @@ function main(): void {
   // run tests
   const results = new Map<string, { test: TestCaseDefinition; report: TestCaseReport }>();
   for (const test of toRun) {
-    const result = runTest(test, args);
-    if (result instanceof UnexecutedReason) {
-      unexecuted.set(test.name, result);
-    } else {
-      results.set(test.name, { test, report: result });
+    try {
+      const result = runTest(test, args);
+      if (result instanceof UnexecutedReason) {
+        unexecuted.set(test.name, result);
+      } else {
+        results.set(test.name, { test, report: result });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      unexecuted.set(test.name, new UnexecutedReason(UnexecutedReasonCode.CANNOT_EXECUTE, msg));
     }
   }
 

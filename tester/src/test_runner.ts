@@ -1,15 +1,4 @@
-// test-runner.ts
-// filterTests(tests, args) → {toRun, filtered}
-//   - include/exclude logic
-//   - regex if args.regex_filters
-
-// runTest(test, args) → TestCaseReport
-//   - EXECUTE_ONLY: run interpreter on .xml file
-//   - COMBINED: run sol2xml → then interpreter
-//   - PARSE_ONLY: run only sol2xml
-//   - compare exit code, diff stdout
-
-// buildReport(tests, results, unexecuted) → TestReport
+// runs tests and builds the final report
 
 import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync } from "node:fs";

@@ -1,18 +1,4 @@
-// test-parser.ts
-// discoverTests(dir, recursive) → string[]  (paths to .test files)
-// parseTestFile(path) → TestCaseDefinition | UnexecutedReason
-
-// parseTestFile logic:
-// 1. read lines from file
-// 2. collect: ***, +++, !C!, !I!, >>>
-// 3. find empty line → rest is source code
-// 4. determine test type:
-//    - only !C!, no !I! → PARSE_ONLY
-//    - only !I!, no !C! → EXECUTE_ONLY
-//    - both !C! and !I! → COMBINED
-//    - neither → CANNOT_DETERMINE_TYPE
-// 5. check for .in, .out files
-// 6. return TestCaseDefinition
+// discovers and parses .test files into TestCaseDefinition objects
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
