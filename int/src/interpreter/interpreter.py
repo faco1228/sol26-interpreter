@@ -153,6 +153,7 @@ def builtin_block_new(_reciever: SolObject, _args: list[SolObject], runtime: Run
 
 
 def is_instance(obj: SolObject, cls_name: str) -> bool:
+    """return True if obj is an instance of cls_name or any of its subclasses"""
     current = obj.sol_class
     while current is not None:
         if current.name == cls_name:
@@ -689,7 +690,7 @@ class Runtime:
         self_obj: SolObject,
         current_cls: SolClass | None = None,
     ) -> SolObject:
-        """catch a block literal as Block object"""
+        """capture a block literal into a Block runtime object"""
         obj = SolObject()
         obj.sol_class = self.block_class
         obj.attributes["__block__"] = block
@@ -801,7 +802,7 @@ class Interpreter:
     """
 
     def __init__(self) -> None:
-        """Init with no program loaded."""
+        """init with no program loaded"""
         self.current_program: Program | None = None
 
     def load_program(self, source_file_path: Path) -> None:

@@ -1,4 +1,15 @@
-// discovers and parses .test files into TestCaseDefinition objects
+/**
+ * discovers and parses .test files into TestCaseDefinition objects
+ *
+ * recursively scans a given directory for files with the .test extension,
+ * reads their headers to extract metadata (category, description, type,
+ * expected exit codes, points, and optional stdin/stdout file references),
+ * and constructs TestCaseDefinition instances for use by the test runner
+ * 
+ * malformed or invalid test files are reported as unexecuted
+ *
+ * @author Samuel Fačka <xfackas00>
+ */
 
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";

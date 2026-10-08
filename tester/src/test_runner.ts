@@ -1,4 +1,16 @@
-// runs tests and builds the final report
+/**
+ * executes test cases and builds the final JSON report
+ *
+ * supports three test types: parse-only (runs sol2xml parser and checks its
+ * exit code), execute-only (runs the interpreter directly on a SOL-XML file),
+ * and combined (pipes SOL source through the parser then the interpreter)
+ * 
+ * results are compared against expected exit codes and optional expected output
+ * files using diff, the final report groups passed and failed results by
+ * category and includes any unexecuted tests with a reason code
+ *
+ * @author Samuel Fačka <xfackas00>
+ */
 
 import { spawnSync } from "node:child_process";
 import { writeFileSync, mkdtempSync, rmSync, readFileSync } from "node:fs";
